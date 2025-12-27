@@ -142,11 +142,27 @@ async def get_signals():
 
 @app.get("/api/status")
 async def get_status():
+    # 强制重新读取一次配置，确保 interval 是最新的
+    with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+        import yaml
+        latest_config = yaml.safe_load(f)
+        interval = latest_config.get('monitor', {}).get('interval', 5)
+        monitor.config = latest_config # 同步给 monitor 实例
+        
     return {
         "status": monitor.status,
         "last_scan_time": monitor.last_scan_time,
-        "stock_count": len(monitor.get_monitored_stocks())
+        "stock_count": len(monitor.get_monitored_stocks()),
+        "interval": interval
     }
+
+@app.post("/api/config")
+async def update_config(config: dict):
+    success = monitor.update_config(config)
+    if success:
+        return {"status": "success"}
+    else:
+        return {"status": "error", "message": "Failed to update config"}
 
 @app.post("/api/monitor/start")
 async def start_monitor():

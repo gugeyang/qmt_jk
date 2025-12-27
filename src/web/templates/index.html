@@ -141,6 +141,109 @@
             opacity: 0.7;
         }
 
+        .config-input {
+            background-color: #333;
+            border: 1px solid #444;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            width: 50px;
+            margin: 0 5px;
+            text-align: center;
+        }
+
+        /* UI 增强样式 */
+        .ui-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            align-items: stretch;
+        }
+
+        .ui-card {
+            background: #252526;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            height: 52px;
+            flex: 1;
+            transition: border-color 0.2s;
+        }
+
+        .ui-card:hover {
+            border-color: #444;
+        }
+
+        .ui-btn {
+            height: 32px;
+            padding: 0 16px;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+        }
+
+        .btn-secondary {
+            background-color: #3e3e42;
+            border-color: #454545;
+            color: #ccc;
+        }
+
+        .btn-secondary:hover {
+            background-color: #454545;
+            color: #fff;
+        }
+
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+
+        .btn-success {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #1e8449;
+        }
+
+        .ui-input {
+            background-color: #1e1e1e;
+            border: 1px solid #3c3c3c;
+            color: #d4d4d4;
+            padding: 4px 8px;
+            border-radius: 4px;
+            width: 48px;
+            margin: 0 8px;
+            text-align: center;
+            height: 24px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .status-label {
+            color: #888;
+            margin-right: 8px;
+            font-size: 0.9em;
+        }
+
+        .status-value {
+            font-weight: 600;
+        }
+
         @keyframes slideIn {
             from {
                 transform: translateX(100%);
@@ -169,18 +272,34 @@
                 <div style="display: flex; gap: 10px; margin-bottom: 20px;">
                     <input type="text" id="stock-input" placeholder="输入代码(如 600000) 或 名称(如 浦发银行)"
                         style="padding: 12px; flex: 1; border-radius: 4px; border: 1px solid #444; background: #333; color: white; font-size: 16px;">
-                    <button onclick="addStock()"
-                        style="padding: 10px 30px; background: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">添加监控</button>
+                    <button onclick="addStock()" class="ui-btn btn-success"
+                        style="height: 48px; border-radius: 4px; padding: 0 30px;">添加监控</button>
                 </div>
-                <div id="system-info"
-                    style="margin-bottom: 15px; padding: 15px; background: #222; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; gap: 20px;">
-                        <span>系统状态: <b id="sys-status">就绪</b></span>
-                        <span>监控总数: <b id="sys-count">0</b></span>
+                <div class="ui-row">
+                    <!-- 左侧：系统状态 -->
+                    <div class="ui-card" style="justify-content: space-between;">
+                        <div style="display: flex; gap: 30px;">
+                            <div>
+                                <span class="status-label">系统状态</span>
+                                <span id="sys-status" class="status-value">就绪</span>
+                            </div>
+                            <div>
+                                <span class="status-label">监控总数</span>
+                                <span id="sys-count" class="status-value">0</span>
+                            </div>
+                        </div>
+                        <button id="btn-toggle-monitor" class="ui-btn" onclick="toggleMonitor()">启动监控</button>
                     </div>
-                    <div id="monitor-controls">
-                        <button id="btn-toggle-monitor" onclick="toggleMonitor()"
-                            style="padding: 8px 20px; background: #ff4d4d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">停止监控</button>
+
+                    <!-- 右侧：全局配置 -->
+                    <div class="ui-card" style="justify-content: space-between;">
+                        <div style="display: flex; align-items: center;">
+                            <span class="status-label">扫描间隔</span>
+                            <input type="number" id="scan-interval" class="ui-input" min="1" max="3600"
+                                placeholder="..">
+                            <span style="color: #666; font-size: 0.8em;">秒</span>
+                        </div>
+                        <button class="ui-btn btn-secondary" onclick="saveConfig()">保存设置</button>
                     </div>
                 </div>
                 <h3>当前监控列表</h3>
@@ -240,8 +359,10 @@
         // 初始化加载
         loadStocks();
         loadSignals();
-        updateSystemStatus();
-        setInterval(updateSystemStatus, 5000); // 每5秒更新一次状态
+        // 强制首次同步状态，确保 interval 被填入
+        updateSystemStatus(true);
+
+        setInterval(() => updateSystemStatus(), 5000); // 每5秒更新一次状态
         setInterval(loadStocks, 5000); // 每5秒刷新一次行情
 
         let ws;
@@ -278,30 +399,41 @@
         // 初始化连接
         connectWebSocket();
 
-        async function updateSystemStatus() {
+        async function updateSystemStatus(isInitial = false) {
             try {
                 const res = await fetch('/api/status');
                 const data = await res.json();
                 const isRunning = data.status === 'Running';
+
+                // 只有在没被选中，或者初始化时才更新显示值
+                const intervalInput = document.getElementById('scan-interval');
+                if (isInitial || document.activeElement !== intervalInput) {
+                    intervalInput.value = data.interval;
+                }
 
                 sysStatusSpan.innerText = isRunning ? '正在监控' : '已停止';
                 sysStatusSpan.style.color = isRunning ? '#2ecc71' : '#ff4d4d';
                 lastScanDiv.innerText = `上次扫描: ${data.last_scan_time || '-'}`;
                 sysCountSpan.innerText = data.stock_count;
 
-                // 更新按钮状态
+                // 更新按钮状态与颜色
                 const btn = document.getElementById('btn-toggle-monitor');
                 if (isRunning) {
                     btn.innerText = '停止监控';
-                    btn.style.backgroundColor = '#ff4d4d';
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-danger');
                 } else {
                     btn.innerText = '启动监控';
-                    btn.style.backgroundColor = '#2ecc71';
+                    btn.classList.remove('btn-danger');
+                    btn.classList.add('btn-success');
                 }
             } catch (e) {
                 console.error("Failed to update status", e);
             }
         }
+
+        // 调用初始化状态获取
+        updateSystemStatus(true);
 
         async function toggleMonitor() {
             const btn = document.getElementById('btn-toggle-monitor');
@@ -319,6 +451,46 @@
             }
         }
 
+        async function saveConfig() {
+            const intervalInput = document.getElementById('scan-interval');
+            const interval = parseInt(intervalInput.value);
+            if (isNaN(interval) || interval < 1) {
+                alert('请输入有效的扫描间隔（大于0）');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ interval: interval })
+                });
+
+                if (response.ok) {
+                    alert('配置已成功保存！');
+                    const statusRes = await fetch('/api/status');
+                    const statusData = await statusRes.json();
+                    const isRunning = statusData.status === 'Running';
+
+                    if (isRunning) {
+                        if (confirm('是否立即重启监控以应用新间隔？')) {
+                            await fetch('/api/monitor/stop', { method: 'POST' });
+                            setTimeout(async () => {
+                                await fetch('/api/monitor/start', { method: 'POST' });
+                                showToast({ stock_code: '系统', timeframe: '全局', signal_type: '监控已重启并应用新配置' }, true);
+                                updateSystemStatus(true);
+                            }, 500);
+                        }
+                    } else {
+                        showToast({ stock_code: '系统', timeframe: '全局', signal_type: '扫描间隔已设定，下次启动生效' }, true);
+                    }
+                }
+            } catch (error) {
+                console.error('Save config error:', error);
+                alert('保存配置失败');
+            }
+        }
+
         async function loadStocks() {
             try {
                 const res = await fetch('/api/stocks');
@@ -333,7 +505,7 @@
                         <td style="color: ${changeColor}; font-weight: bold;">${stock.price.toFixed(2)}</td>
                         <td style="color: ${changeColor}; font-weight: bold;">${stock.change_pct > 0 ? '+' : ''}${stock.change_pct.toFixed(2)}%</td>
                         <td>${stock.added_at}</td>
-                        <td><button onclick="deleteStock('${stock.code}')" style="color: #ff4d4d; background: none; border: none; cursor: pointer;">删除</button></td>
+                        <td><button onclick="deleteStock('${stock.code}')" class="ui-btn btn-secondary" style="height: 24px; padding: 0 8px; font-size: 11px; border-color: rgba(231, 76, 60, 0.3); color: #e74c3c;">删除</button></td>
                     `;
                 });
             } catch (e) {

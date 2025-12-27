@@ -33,14 +33,33 @@ class QMTClient:
     def get_kline(self, stock_code: str, period: str, count: int = 200) -> pd.DataFrame:
         if not self.xt_data:
             return pd.DataFrame()
+            
+        # 预检合法周期，防止底层报错刷屏
+        valid_periods = ['tick', '1m', '5m', '15m', '30m', '1h', '1d', '1w', '1mon', '1q', '1hy', '1y']
+        if period not in valid_periods:
+            print(f"警告: 周期 '{period}' 不受 QMT 官方支持，已跳过。请使用: {', '.join(valid_periods)}")
+            return pd.DataFrame()
         
         try:
             # 统一转为大写，防止大小写错误导致获取失败
             stock_code = stock_code.upper()
             
-            # 下载历史数据 (增量下载，减少负担)
+            # 根据周期智能计算下载深度，确保足够的技术指标计算数据
             from datetime import datetime, timedelta
-            start_date = (datetime.now() - timedelta(days=5)).strftime('%Y%m%d')
+            now = datetime.now()
+            if period.endswith('m') or period == '1h':
+                days = 30  # 分钟线下载最近 30 天足以满足 200 根
+            elif period == '1d':
+                days = 365 * 2 # 日线下载 2 年
+            elif period == '1w':
+                days = 365 * 10 # 周线下载 10 年
+            elif period == '1mon':
+                days = 365 * 20 # 月线下载 20 年
+            else:
+                days = 5
+                
+            start_date = (now - timedelta(days=days)).strftime('%Y%m%d')
+            # 开启异步下载模式，QMT 内部会处理增量
             self.xt_data.download_history_data(stock_code, period, start_date)
             
             # 获取市场数据

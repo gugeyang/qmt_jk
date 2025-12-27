@@ -12,6 +12,7 @@ class MonitorService:
     def __init__(self, config_path: str, db_path: str):
         self.client = QMTClient(config_path)
         self.db_path = db_path
+        self.config_path = config_path
         self.config = self.client.config
         self.running = False
         self.alerts = []
@@ -78,31 +79,37 @@ class MonitorService:
     def scan_stock(self, stock_code: str):
         timeframes = self.config['monitor']['timeframes']
         for tf in timeframes:
-            df = self.client.get_kline(stock_code, tf)
-            if df.empty:
-                continue
-            
-            # 获取当前最后一根 K 线的时间戳作为该周期的“指纹”
-            current_bar_time = df.index[-1]
-            if isinstance(current_bar_time, (int, float, np.integer)): # 处理时间戳格式
-                # QMT 可能返回毫秒或秒，转换成标准字符串
-                from datetime import datetime
-                ts = current_bar_time / 1000 if current_bar_time > 1e11 else current_bar_time
-                current_bar_time = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-            
-            # TD9
-            td_signals = calculate_td_sequential(df)
-            if td_signals['buy_9']:
-                self._save_signal(stock_code, tf, 'TD低9', df['close'].iloc[-1], current_bar_time)
-            if td_signals['sell_9']:
-                self._save_signal(stock_code, tf, 'TD高9', df['close'].iloc[-1], current_bar_time)
-            
-            # Divergence
-            div_signals = detect_divergence(df)
-            if div_signals['bull_div']:
-                self._save_signal(stock_code, tf, 'MACD底背离', df['close'].iloc[-1], current_bar_time)
-            if div_signals['bear_div']:
-                self._save_signal(stock_code, tf, 'MACD顶背离', df['close'].iloc[-1], current_bar_time)
+            try:
+                df = self.client.get_kline(stock_code, tf)
+                if df.empty:
+                    continue
+                
+                # 获取当前最后一根 K 线的时间戳作为该周期的“指纹”
+                # 注意：get_kline 已经做过 reset_index，时间戳现在在 'time' 列中
+                raw_time = df['time'].iloc[-1]
+                if isinstance(raw_time, (int, float, np.integer)):
+                    ts = raw_time / 1000 if raw_time > 1e11 else raw_time
+                    current_bar_time = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    current_bar_time = str(raw_time)
+                
+                # TD9
+                td_signals = calculate_td_sequential(df)
+                if td_signals['buy_9']:
+                    self._save_signal(stock_code, tf, 'TD低9', df['close'].iloc[-1], current_bar_time)
+                if td_signals['sell_9']:
+                    self._save_signal(stock_code, tf, 'TD高9', df['close'].iloc[-1], current_bar_time)
+                
+                # Divergence
+                div_signals = detect_divergence(df)
+                if div_signals['bull_div']:
+                    self._save_signal(stock_code, tf, 'MACD底背离', df['close'].iloc[-1], current_bar_time)
+                if div_signals['bear_div']:
+                    self._save_signal(stock_code, tf, 'MACD顶背离', df['close'].iloc[-1], current_bar_time)
+            except Exception as e:
+                print(f"扫描 {stock_code} {tf} 周期异常: {e}")
+                import traceback
+                traceback.print_exc()
 
     def run(self):
         self.running = True
@@ -129,7 +136,8 @@ class MonitorService:
                     print(f"扫描 {stock} 异常: {e}")
             
             # 这里的时延也要能被中断
-            for _ in range(5):
+            interval = self.config['monitor'].get('interval', 5)
+            for _ in range(int(interval)):
                 if not self.running: break
                 time.sleep(1)
 
@@ -145,3 +153,28 @@ class MonitorService:
         self.running = False
         self.status = "Stopped"
         print("监控服务已停止")
+
+    def update_config(self, updates: dict):
+        """更新配置并保存到磁盘"""
+        import yaml
+        
+        # 1. 更新内存
+        if 'interval' in updates:
+            self.config['monitor']['interval'] = updates['interval']
+            
+        # 2. 持久化到磁盘
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                full_config = yaml.safe_load(f)
+            
+            if 'interval' in updates:
+                if 'monitor' not in full_config:
+                    full_config['monitor'] = {}
+                full_config['monitor']['interval'] = updates['interval']
+                
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(full_config, f, allow_unicode=True, sort_keys=False)
+            return True
+        except Exception as e:
+            print(f"保存配置文件失败: {e}")
+            return False

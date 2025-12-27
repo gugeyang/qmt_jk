@@ -1,0 +1,27 @@
+# 忽略配置文件（包含敏感数据库密码）
+config.yaml
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 数据库文件
+*.db
+data/*.db
+
+# 日志
+logs/
+*.log
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 编辑器配置
+.idea/
+.vscode/
+*.swp
+*.swo

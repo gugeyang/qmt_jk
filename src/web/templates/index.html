@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QMT 股票实时监控系统</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --card-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+            --accent-color: #00adb5;
+            --buy-color: #ff4d4d;
+            --sell-color: #2ecc71;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #444;
+        }
+
+        th {
+            color: var(--accent-color);
+        }
+
+        .signal-buy {
+            color: var(--buy-color);
+            font-weight: bold;
+        }
+
+        .signal-sell {
+            color: var(--sell-color);
+            font-weight: bold;
+        }
+
+        .signal-container {
+            max-height: 400px;
+            /* 固定高度 */
+            overflow-y: auto;
+            /* 内部滚动 */
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #222;
+        }
+
+        /* 隐藏滚动条样式 */
+        .signal-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .signal-container::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        .signal-container::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+
+        .signal-container::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-color);
+        }
+
+        #alert-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+            animation: slideIn 0.5s ease-out;
+            border-left: 5px solid rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            /* 增加点击手势 */
+            position: relative;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+
+        .toast:hover {
+            transform: scale(1.02);
+            filter: brightness(1.1);
+        }
+
+        .toast::after {
+            content: "×";
+            /* 提示可关闭 */
+            position: absolute;
+            right: 10px;
+            top: 5px;
+            font-size: 18px;
+            opacity: 0.7;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+            }
+
+            to {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>QMT 股票实时监控系统</h1>
+            <div style="text-align: right;">
+                <div id="status">连接中...</div>
+                <div id="last-scan" style="font-size: 0.8em; color: #888;">上次扫描: -</div>
+            </div>
+        </header>
+
+        <div class="dashboard">
+            <div class="card">
+                <h2>监控管理</h2>
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <input type="text" id="stock-input" placeholder="输入代码(如 600000) 或 名称(如 浦发银行)"
+                        style="padding: 12px; flex: 1; border-radius: 4px; border: 1px solid #444; background: #333; color: white; font-size: 16px;">
+                    <button onclick="addStock()"
+                        style="padding: 10px 30px; background: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">添加监控</button>
+                </div>
+                <div id="system-info"
+                    style="margin-bottom: 15px; padding: 15px; background: #222; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; gap: 20px;">
+                        <span>系统状态: <b id="sys-status">就绪</b></span>
+                        <span>监控总数: <b id="sys-count">0</b></span>
+                    </div>
+                    <div id="monitor-controls">
+                        <button id="btn-toggle-monitor" onclick="toggleMonitor()"
+                            style="padding: 8px 20px; background: #ff4d4d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">停止监控</button>
+                    </div>
+                </div>
+                <h3>当前监控列表</h3>
+                <table id="stock-table">
+                    <thead>
+                        <tr>
+                            <th>代码</th>
+                            <th>名称</th>
+                            <th>现价</th>
+                            <th>涨跌幅</th>
+                            <th>添加时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 股票列表 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2>实时预警信号</h2>
+                <div class="signal-container">
+                    <table id="signal-table">
+                        <thead>
+                            <tr style="position: sticky; top: 0; background: var(--card-bg); z-index: 10;">
+                                <th>时间</th>
+                                <th>股票</th>
+                                <th>周期</th>
+                                <th>信号类型</th>
+                                <th>价格</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- 信号将通过 JS 动态插入 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="alert-toast"></div>
+
+    <audio id="alert-sound" src="https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3"></audio>
+
+    <script>
+        const signalTable = document.getElementById('signal-table').getElementsByTagName('tbody')[0];
+        const stockTable = document.getElementById('stock-table').getElementsByTagName('tbody')[0];
+        const statusDiv = document.getElementById('status');
+        const lastScanDiv = document.getElementById('last-scan');
+        const sysStatusSpan = document.getElementById('sys-status');
+        const sysCountSpan = document.getElementById('sys-count');
+        const alertToast = document.getElementById('alert-toast');
+        const alertSound = document.getElementById('alert-sound');
+
+        // 初始化加载
+        loadStocks();
+        loadSignals();
+        updateSystemStatus();
+        setInterval(updateSystemStatus, 5000); // 每5秒更新一次状态
+        setInterval(loadStocks, 5000); // 每5秒刷新一次行情
+
+        let ws;
+        function connectWebSocket() {
+            const wsUrl = `ws://${window.location.host}/ws/alerts`;
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                statusDiv.innerText = '实时连接: 已开启';
+                statusDiv.style.color = '#2ecc71';
+                console.log('WebSocket connected');
+            };
+
+            ws.onclose = () => {
+                statusDiv.innerText = '实时连接: 已断开 (正在尝试重连...)';
+                statusDiv.style.color = '#ff4d4d';
+                console.log('WebSocket disconnected. Reconnecting in 3 seconds...');
+                setTimeout(connectWebSocket, 3000); // 3秒后尝试重连
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket error:', err);
+                ws.close();
+            };
+
+            ws.onmessage = (event) => {
+                const alert = JSON.parse(event.data);
+                const isBuy = addSignalToTable(alert); // 修改 addSignalToTable 返回是否看涨
+                showToast(alert, isBuy);
+                alertSound.play();
+            };
+        }
+
+        // 初始化连接
+        connectWebSocket();
+
+        async function updateSystemStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                const isRunning = data.status === 'Running';
+
+                sysStatusSpan.innerText = isRunning ? '正在监控' : '已停止';
+                sysStatusSpan.style.color = isRunning ? '#2ecc71' : '#ff4d4d';
+                lastScanDiv.innerText = `上次扫描: ${data.last_scan_time || '-'}`;
+                sysCountSpan.innerText = data.stock_count;
+
+                // 更新按钮状态
+                const btn = document.getElementById('btn-toggle-monitor');
+                if (isRunning) {
+                    btn.innerText = '停止监控';
+                    btn.style.backgroundColor = '#ff4d4d';
+                } else {
+                    btn.innerText = '启动监控';
+                    btn.style.backgroundColor = '#2ecc71';
+                }
+            } catch (e) {
+                console.error("Failed to update status", e);
+            }
+        }
+
+        async function toggleMonitor() {
+            const btn = document.getElementById('btn-toggle-monitor');
+            const isRunning = btn.innerText === '停止监控';
+            const action = isRunning ? 'stop' : 'start';
+
+            try {
+                const res = await fetch(`/api/monitor/${action}`, { method: 'POST' });
+                if (res.ok) {
+                    updateSystemStatus();
+                    showToast({ stock_code: '系统', timeframe: '全局', signal_type: isRunning ? '监控已计划停止' : '监控已计划启动' }, !isRunning);
+                }
+            } catch (e) {
+                alert('操作失败: ' + e);
+            }
+        }
+
+        async function loadStocks() {
+            try {
+                const res = await fetch('/api/stocks');
+                const stocks = await res.json();
+                stockTable.innerHTML = '';
+                stocks.forEach(stock => {
+                    const row = stockTable.insertRow();
+                    const changeColor = stock.change_pct > 0 ? '#ff4d4d' : (stock.change_pct < 0 ? '#2ecc71' : '#e0e0e0');
+                    row.innerHTML = `
+                        <td>${stock.code}</td>
+                        <td>${stock.name || '-'}</td>
+                        <td style="color: ${changeColor}; font-weight: bold;">${stock.price.toFixed(2)}</td>
+                        <td style="color: ${changeColor}; font-weight: bold;">${stock.change_pct > 0 ? '+' : ''}${stock.change_pct.toFixed(2)}%</td>
+                        <td>${stock.added_at}</td>
+                        <td><button onclick="deleteStock('${stock.code}')" style="color: #ff4d4d; background: none; border: none; cursor: pointer;">删除</button></td>
+                    `;
+                });
+            } catch (e) {
+                console.error("Failed to load stocks", e);
+            }
+        }
+
+        async function loadSignals() {
+            const res = await fetch('/api/signals');
+            const signals = await res.json();
+            signalTable.innerHTML = '';
+            signals.forEach(addSignalToTable);
+        }
+
+        async function addStock() {
+            const input = document.getElementById('stock-input');
+            const code = input.value.trim();
+            if (!code) return alert('请输入股票代码或名称');
+
+            const res = await fetch('/api/stocks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
+            });
+            const result = await res.json();
+            if (result.status === 'success') {
+                input.value = '';
+                loadStocks();
+                showToast({ stock_code: result.data.code, timeframe: '系统', signal_type: '添加成功' });
+            } else {
+                alert('添加失败: ' + result.message);
+            }
+        }
+
+        async function deleteStock(code) {
+            if (!confirm(`确定删除 ${code} 吗？`)) return;
+            const res = await fetch(`/api/stocks/${code}`, { method: 'DELETE' });
+            const result = await res.json();
+            if (result.status === 'success') {
+                loadStocks();
+            }
+        }
+
+        function addSignalToTable(alert) {
+            const row = signalTable.insertRow(0);
+            const stockCode = alert.stock_code || alert.code;
+            const stockName = alert.name || '';
+            const displayName = stockName ? `${stockName} (${stockCode})` : stockCode;
+
+            // 信号名称字典 (转换历史英文信号)
+            const signalMap = {
+                'DIV_BULL': 'MACD底背离',
+                'DIV_BEAR': 'MACD顶背离',
+                'TD9_BUY': 'TD低9',
+                'TD9_SELL': 'TD高9'
+            };
+
+            let signalType = alert.signal_type;
+            // 只要匹配字典，就强制转换
+            if (signalMap[signalType]) {
+                signalType = signalMap[signalType];
+            }
+
+            // 颜色逻辑：低/底 -> 红色 (signal-buy), 高/顶 -> 绿色 (signal-sell)
+            // 匹配中文关键词以确保颜色准确
+            const isBuy = signalType.includes('低') || signalType.includes('底') || signalType.includes('BULL') || signalType.includes('BUY');
+            const signalClass = isBuy ? 'signal-buy' : 'signal-sell';
+
+            row.innerHTML = `
+                <td>${alert.timestamp || alert.added_at}</td>
+                <td>${displayName}</td>
+                <td>${alert.timeframe}</td>
+                <td class="${signalClass}">
+                    ${signalType}
+                </td>
+                <td>${alert.price}</td>
+            `;
+
+            // 更新该警报的对象属性，确保 toast 使用正确的中文
+            alert.display_signal = signalType;
+            return isBuy;
+        }
+
+        function showToast(alert, isBuy) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+
+            // 根据买卖信号设置气泡背景色
+            if (isBuy !== undefined) {
+                toast.style.backgroundColor = isBuy ? '#d32f2f' : '#27ae60';
+            }
+
+            const signal = alert.display_signal || alert.signal_type;
+            toast.innerHTML = `
+                <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">新信号提醒</div>
+                <div>${alert.name || alert.stock_code} (${alert.timeframe}) - ${signal}</div>
+                <div style="font-size: 0.8em; margin-top: 5px; opacity: 0.8; text-align: right;">点击关闭</div>
+            `;
+
+            // 手动点击关闭
+            toast.onclick = () => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 200);
+            };
+
+            alertToast.appendChild(toast);
+            // 不再使用 setTimeout 自动删除
+        }
+    </script>
+</body>
+
+</html>

@@ -157,15 +157,37 @@ class MonitorService:
             # 信号去重和保存
             self._save_signal(stock_code, 'tick', signal_type, p['price'], current_time)
 
+    def is_trading_time(self):
+        """判定当前是否处于交易时段 (V20.Final-Guard)"""
+        sessions = self.config.get('monitor', {}).get('trading_sessions')
+        if not sessions:
+            return True # 如果没配，默认全天运行
+            
+        now_str = datetime.now().strftime('%H:%M')
+        for start, end in sessions:
+            if start <= now_str <= end:
+                return True
+        return False
+
+    def get_status_display(self):
+        """获取人性化的状态描述 (V21.Final-UX)"""
+        if not self.running:
+            return "已停止"
+        if not self.is_trading_time():
+            return "已暂停 (非交易时段)"
+        return "正在运行"
+
     def run(self):
         self.running = True
-        self.status = "Running"
         print("监控服务已启动...")
         while self.running:
-            # 每轮扫描检查一次 running 状态
-            if not self.running:
-                break
-                
+            # 交易时间判定 (V20.Final-Guard)
+            if not self.is_trading_time():
+                self.status = self.get_status_display()
+                time.sleep(30)
+                continue
+            
+            self.status = self.get_status_display()
             self.last_scan_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             stocks = self.get_monitored_stocks()
             if not stocks:

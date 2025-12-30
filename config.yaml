@@ -1,0 +1,60 @@
+qmt:
+  path: E:\gj_qmt\bin.x64
+  market: 沪深A股
+database:
+  host: 192.168.3.118
+  port: 33306
+  user: qmt_db
+  password: RZmfGsKPTrNHebW6
+  database: qmt_db
+monitor:
+  trading_sessions:
+  - - 09:15
+    - '11:30'
+  - - '13:00'
+    - '15:00'
+  stocks:
+  - 000001.SZ
+  - 600036.SH
+  - 000300.SH
+  timeframes:
+  - 1m
+  - 5m
+  - 15m
+  - 30m
+  - 1h
+  - 1d
+  - 1w
+  - 1mon
+  interval: 15
+  special_numbers:
+  - 111
+  - 222
+  - 333
+  - 444
+  - 555
+  - 666
+  - 777
+  - 888
+  - 999
+  - 1111
+  - 2222
+  - 3333
+  - 4444
+  - 5555
+  - 6666
+  - 7777
+  - 8888
+  - 9999
+  - 1818
+  - 2828
+  - 1888
+  - 2888
+  - 1188
+  - 2288
+  - 886
+  depth_gap_ratio: 0.01
+  depth_min_vol: 1000
+web:
+  host: 0.0.0.0
+  port: 8000

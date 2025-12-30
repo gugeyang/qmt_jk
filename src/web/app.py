@@ -155,7 +155,7 @@ async def get_status():
         monitor.config = latest_config # 同步给 monitor 实例
         
     return {
-        "status": monitor.status,
+        "status": monitor.get_status_display(),
         "last_scan_time": monitor.last_scan_time,
         "stock_count": len(monitor.get_monitored_stocks()),
         "interval": interval
@@ -204,13 +204,19 @@ async def websocket_endpoint(websocket: WebSocket):
 # 背景任务：全市场统计更新
 async def market_stats_updater():
     global current_market_stats
+    is_first_update = True
     while True:
         try:
+            # 交易时间判定 (V21.Final-UX: 首次启动允许更新一次以初始化界面)
+            if not monitor.is_trading_time() and not is_first_update:
+                await asyncio.sleep(60)
+                continue
+                
             # 使用 to_thread 避免同步调用阻塞异步事件循环
-            # 否则 10 次 get_kline 可能消耗数秒时间，导致 WebSocket 广播(弹窗)卡顿
             stats = await asyncio.to_thread(market_stats_service.update_stats)
             if stats:
                 current_market_stats = stats
+                is_first_update = False # 成功初始化后标记
         except Exception as e:
             print(f"统计更新异常: {e}")
         await asyncio.sleep(15) # 每15秒统计一次

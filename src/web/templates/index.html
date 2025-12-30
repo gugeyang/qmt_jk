@@ -103,6 +103,33 @@
             background: #222;
         }
 
+        /* 极致简约暗色滚动条 (V22.Final-DarkScroll) */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+            border: 2px solid var(--bg-color);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #444;
+        }
+
+        /* Firefox 支持 */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #333 rgba(255, 255, 255, 0.02);
+        }
+
         #alert-toast {
             position: fixed;
             top: 20px;
@@ -647,9 +674,11 @@
                 // 1. 系统状态
                 const sRes = await fetch('/api/status');
                 const sData = await sRes.json();
-                const isRunning = sData.status === 'Running';
-                sysStatusSpan.innerText = isRunning ? '正在运行' : '已停止';
-                sysStatusSpan.style.color = isRunning ? '#2ecc71' : '#ff4d4d';
+                const statusText = sData.status || '未知';
+                sysStatusSpan.innerText = statusText;
+                if (statusText === '正在运行') sysStatusSpan.style.color = '#2ecc71';
+                else if (statusText.includes('暂停')) sysStatusSpan.style.color = '#f1c40f';
+                else sysStatusSpan.style.color = '#ff4d4d';
                 sysCountSpan.innerText = sData.stock_count;
                 lastScanDiv.innerText = '上次扫描: ' + (sData.last_scan_time || '-');
 
@@ -657,8 +686,9 @@
                 if (document.activeElement !== intervalInp) intervalInp.value = sData.interval;
 
                 const btn = document.getElementById('btn-toggle');
-                btn.innerText = isRunning ? '停止监控' : '启动监控';
-                btn.className = isRunning ? 'ui-btn btn-danger' : 'ui-btn btn-success';
+                const isActive = statusText === '正在运行' || statusText.includes('暂停');
+                btn.innerText = isActive ? '停止监控' : '启动监控';
+                btn.className = isActive ? 'ui-btn btn-danger' : 'ui-btn btn-success';
 
                 // 2. 股票列表
                 const stRes = await fetch('/api/stocks');
@@ -781,7 +811,24 @@
 
         // 操作
         async function toggleMonitor() {
-            const action = sysStatusSpan.innerText === '正在运行' ? 'stop' : 'start';
+            const status = sysStatusSpan.innerText;
+            const isClosing = status === '正在运行' || status.includes('暂停');
+            const action = isClosing ? 'stop' : 'start';
+
+            // 点击启动且处于非交易时间，给予温情提示
+            if (action === 'start') {
+                const now = new Date();
+                const hour = now.getHours();
+                const min = now.getMinutes();
+                const timeStr = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+
+                // 粗略判断（实际交由后端严谨判定，前端只负责提示）
+                const isOffTime = (timeStr < '09:15' || (timeStr > '11:35' && timeStr < '12:55') || timeStr > '15:10');
+                if (isOffTime) {
+                    showToast({ name: '系统提示', timeframe: 'UX', display_type: '已预约启动：当前非交易时段，系统将自动进入静默休眠，待开盘后自动唤醒。', stock_code: 'INFO' }, false);
+                }
+            }
+
             await fetch(`/api/monitor/${action}`, { method: 'POST' });
             refresh();
         }

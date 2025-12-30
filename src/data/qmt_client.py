@@ -11,6 +11,9 @@ class QMTClient:
         
         self.qmt_path = self.config['qmt']['path']
         self.xt_data = None
+        # 记录最后一次执行下载的时间，避免频繁下载导致拥堵
+        self._last_download_time = {} # Key: (stock_code, period), Value: timestamp
+        self._subscribed_klines = set() # 记录已订阅实时K线的股票周期
         self._connect()
 
     def _connect(self):
@@ -44,23 +47,38 @@ class QMTClient:
             # 统一转为大写，防止大小写错误导致获取失败
             stock_code = stock_code.upper()
             
-            # 根据周期智能计算下载深度，确保足够的技术指标计算数据
+            # 冷启动/定期下载机制：避免每15秒扫一次就下载一次
+            import time
             from datetime import datetime, timedelta
-            now = datetime.now()
-            if period.endswith('m') or period == '1h':
-                days = 30  # 分钟线下载最近 30 天足以满足 200 根
-            elif period == '1d':
-                days = 365 * 2 # 日线下载 2 年
-            elif period == '1w':
-                days = 365 * 10 # 周线下载 10 年
-            elif period == '1mon':
-                days = 365 * 20 # 月线下载 20 年
-            else:
-                days = 5
-                
-            start_date = (now - timedelta(days=days)).strftime('%Y%m%d')
-            # 开启异步下载模式，QMT 内部会处理增量
-            self.xt_data.download_history_data(stock_code, period, start_date)
+            now_ts = time.time()
+            cache_key = (stock_code, period)
+            
+            # 动态调整下载间隔：分钟线(及tick)每 2 分钟更新一次，日线以上每 1 小时更新一次
+            update_interval = 120 if (period.endswith('m') or period == 'tick' or period == '1h') else 3600
+            
+            if cache_key not in self._last_download_time or (now_ts - self._last_download_time[cache_key] > update_interval):
+                now_dt = datetime.now()
+                if period.endswith('m') or period == '1h':
+                    days = 30  # 分钟线下载最近 30 天足以满足 200 根
+                elif period == '1d':
+                    days = 365 * 2 # 日线下载 2 年
+                elif period == '1w':
+                    days = 365 * 10 # 周线下载 10 年
+                elif period == '1mon':
+                    days = 365 * 20 # 月线下载 20 年
+                else:
+                    days = 5
+                    
+                start_date = (now_dt - timedelta(days=days)).strftime('%Y%m%d')
+                # 开启下载模式
+                self.xt_data.download_history_data(stock_code, period, start_date)
+                self._last_download_time[cache_key] = now_ts
+                # print(f"已触发 {stock_code} {period} 周期数据下载(间隔: {update_interval}s)")
+            
+            # 建立实时订阅：确保在下次下载前，K 线能通过 Tick 增量更新（这才是秒级准确的关键）
+            if cache_key not in self._subscribed_klines:
+                self.xt_data.subscribe_quote(stock_code, period=period, count=-1)
+                self._subscribed_klines.add(cache_key)
             
             # 获取市场数据
             data = self.xt_data.get_market_data(
@@ -171,9 +189,12 @@ class QMTClient:
             return {}
             
         try:
-            # 订阅行情确保有实时数据流
+            # 订阅行情确保有实时数据流 (增加缓存判断，防止内存泄漏)
             for stock in stock_list:
-                self.xt_data.subscribe_quote(stock, period='tick', count=-1)
+                cache_key = (stock, 'tick')
+                if cache_key not in self._subscribed_klines:
+                    self.xt_data.subscribe_quote(stock, period='tick', count=-1)
+                    self._subscribed_klines.add(cache_key)
             
             res = {}
             ticks = self.xt_data.get_full_tick(stock_list)

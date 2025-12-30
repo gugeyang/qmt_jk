@@ -7,24 +7,32 @@
     <title>QMT 股票实时监控系统</title>
     <style>
         :root {
-            --bg-color: #1a1a1a;
-            --card-bg: #2d2d2d;
-            --text-color: #e0e0e0;
-            --accent-color: #00adb5;
-            --buy-color: #ff4d4d;
-            --sell-color: #2ecc71;
+            --bg-color: #0d0d0f;
+            --card-bg: #1c1c1e;
+            --text-color: #f5f5f7;
+            --accent-color: #00e5ff;
+            --buy-color: #ff3b30;
+            --sell-color: #34c759;
+            --yellow-accent: #ffcc00;
+            --card-border: #2c2c2e;
+            --panel-bg: #151517;
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding: 20px;
+            padding: 30px;
+            line-height: 1.5;
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1440px;
             margin: 0 auto;
         }
 
@@ -32,22 +40,33 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
-            border-bottom: 2px solid var(--accent-color);
-            padding-bottom: 10px;
+            margin-bottom: 32px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #333;
         }
 
-        .dashboard {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 20px;
+        header h1 {
+            font-size: 1.8em;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff, #888);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* 增加间距，解决“粘连接”问题 */
+        .layout-section {
+            margin-bottom: 40px;
+            display: block;
+            width: 100%;
         }
 
         .card {
             background-color: var(--card-bg);
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--card-border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
 
         table {
@@ -77,31 +96,11 @@
         }
 
         .signal-container {
-            max-height: 400px;
-            /* 固定高度 */
+            max-height: 500px;
             overflow-y: auto;
-            /* 内部滚动 */
             border: 1px solid #444;
             border-radius: 4px;
             background: #222;
-        }
-
-        /* 隐藏滚动条样式 */
-        .signal-container::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .signal-container::-webkit-scrollbar-track {
-            background: #1a1a1a;
-        }
-
-        .signal-container::-webkit-scrollbar-thumb {
-            background: #444;
-            border-radius: 4px;
-        }
-
-        .signal-container::-webkit-scrollbar-thumb:hover {
-            background: var(--accent-color);
         }
 
         #alert-toast {
@@ -121,127 +120,358 @@
             animation: slideIn 0.5s ease-out;
             border-left: 5px solid rgba(255, 255, 255, 0.4);
             cursor: pointer;
-            /* 增加点击手势 */
             position: relative;
-            transition: transform 0.2s, opacity 0.2s;
         }
 
-        .toast:hover {
-            transform: scale(1.02);
-            filter: brightness(1.1);
+        /* 市场全景面板最终架构 (V9.Final) */
+        .market-view-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            padding: 0;
+            /* 移除内边距，统一由容器控制 */
         }
 
-        .toast::after {
-            content: "×";
-            /* 提示可关闭 */
-            position: absolute;
-            right: 10px;
-            top: 5px;
-            font-size: 18px;
-            opacity: 0.7;
-        }
-
-        .config-input {
-            background-color: #333;
-            border: 1px solid #444;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 4px;
-            width: 50px;
-            margin: 0 5px;
+        .panorama-title-row {
             text-align: center;
         }
 
-        /* UI 增强样式 */
-        .ui-row {
+        .panorama-title-row h3 {
+            margin: 0;
+            font-size: 1.5em;
+            color: var(--text-color);
+            letter-spacing: 2px;
+        }
+
+        .market-banner-row {
+            width: 100%;
             display: flex;
-            gap: 16px;
-            margin-bottom: 24px;
+            justify-content: center;
+        }
+
+        /* 分布图内部集成统计样式 (V15.Final) */
+        /* 统一卡片头部对齐样式 (V16.Final) */
+        .card-zone-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 40px;
+            /* 统一锁定头部高度 */
+            margin-bottom: 25px;
+            width: 100%;
+        }
+
+        .integrated-stats-row {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9em;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 4px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            flex: 1;
+            justify-content: center;
+            max-width: fit-content;
+            margin: 0 20px;
+        }
+
+        .integrated-stats-row span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .integrated-time {
+            font-size: 0.85em;
+            font-family: 'JetBrains Mono', monospace;
+            color: rgba(255, 255, 255, 0.15);
+            letter-spacing: 0.5px;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        /* 核心对齐网格 - 均分版 */
+        .market-content-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            /* 全屏强制三均分 */
+            gap: 20px;
+            width: 100%;
+            margin: 0 auto;
             align-items: stretch;
         }
 
-        .ui-card {
-            background: #252526;
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 0 20px;
-            display: flex;
-            align-items: center;
-            height: 52px;
-            flex: 1;
-            transition: border-color 0.2s;
+        /* 响应式适配：窗口较小时允许堆叠 */
+        @media (max-width: 1300px) {
+            .market-content-grid {
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            }
         }
 
-        .ui-card:hover {
-            border-color: #444;
+        .content-zone-card {
+            background: #1c1c1e;
+            border-radius: 12px;
+            border: 1px solid #2c2c2e;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            flex: 1;
+            min-width: 0;
+            /* 防溢出关键 */
+            overflow: hidden;
+        }
+
+        .zone-header {
+            margin-bottom: 25px;
+            color: #888;
+            font-size: 0.9em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .zone-header::before {
+            content: '';
+            display: inline-block;
+            width: 3px;
+            height: 14px;
+            background: var(--accent-color, #4a90e2);
+            border-radius: 2px;
+        }
+
+        /* 指数内部布局 */
+        .indices-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            flex: 1;
+        }
+
+        .stat-card {
+            padding: 16px 18px;
+            background: #232326;
+            border-radius: 10px;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.2s ease-out;
+            flex: 1;
+            min-width: 0;
+            /* 防溢出 */
+            overflow: hidden;
+        }
+
+        /* 预留位高级感 */
+        .placeholder-card {
+            background: linear-gradient(135deg, #151517 0%, #1c1c1e 100%);
+            border: 1px solid #2c2c2e;
+            opacity: 0.6;
+            justify-content: center !important;
+            align-items: center !important;
+        }
+
+        .stat-card:hover {
+            background: #2c2c31;
+            transform: translateY(-2px);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .stat-val {
+            font-size: 1.05em;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            gap: 4px;
+        }
+
+        .yellow-line {
+            color: var(--yellow-accent);
+        }
+
+        .white-line {
+            color: #ffffff;
+        }
+
+        .market-tag {
+            font-size: 0.7em;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: #444;
+            margin-left: 5px;
+        }
+
+        .distribution-chart {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            gap: 2px;
+            padding: 30px 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            position: relative;
+            flex: 1;
+            /* 填充卡片高度 */
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            overflow: hidden;
+        }
+
+        .distribution-chart::after {
+            content: '';
+            position: absolute;
+            left: 10px;
+            right: 10px;
+            top: 25%;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.03);
+            box-shadow: 0 45px 0 rgba(255, 255, 255, 0.03), 0 90px 0 rgba(255, 255, 255, 0.03);
+            pointer-events: none;
+        }
+
+        .dist-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100%;
+            justify-content: flex-end;
+        }
+
+        .dist-bar {
+            width: 70%;
+            min-height: 2px;
+            transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            border-radius: 4px 4px 0 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .dist-lbl {
+            font-size: 10px;
+            margin-top: 5px;
+            color: #666;
+        }
+
+        .dist-cnt {
+            font-size: 10px;
+            margin-bottom: 3px;
+            color: #aaa;
+        }
+
+        .up-bg {
+            background: #ff4d4d;
+        }
+
+        .down-bg {
+            background: #2ecc71;
+        }
+
+        .flat-bg {
+            background: #555;
+        }
+
+        /* 通用配置行 */
+        .info-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .info-item {
+            background: #252526;
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: 1px solid #333;
+            display: flex;
+            align-items: center;
+            flex: 1;
         }
 
         .ui-btn {
-            height: 32px;
-            padding: 0 16px;
+            height: 36px;
+            padding: 0 15px;
             border-radius: 4px;
-            border: 1px solid transparent;
-            font-size: 13px;
-            font-weight: 600;
+            border: none;
+            font-weight: bold;
             cursor: pointer;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            white-space: nowrap;
+            transition: opacity 0.2s;
         }
 
-        .btn-secondary {
-            background-color: #3e3e42;
-            border-color: #454545;
-            color: #ccc;
-        }
-
-        .btn-secondary:hover {
-            background-color: #454545;
+        .btn-success {
+            background: #27ae60;
             color: #fff;
         }
 
         .btn-danger {
-            background-color: #e74c3c;
-            color: white;
+            background: #e74c3c;
+            color: #fff;
         }
 
-        .btn-danger:hover {
-            background-color: #c0392b;
-        }
-
-        .btn-success {
-            background-color: #27ae60;
-            color: white;
-        }
-
-        .btn-success:hover {
-            background-color: #1e8449;
+        .btn-gray {
+            background: #444;
+            color: #ccc;
         }
 
         .ui-input {
-            background-color: #1e1e1e;
-            border: 1px solid #3c3c3c;
-            color: #d4d4d4;
-            padding: 4px 8px;
+            background: #111;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 5px;
             border-radius: 4px;
-            width: 48px;
-            margin: 0 8px;
+            width: 60px;
             text-align: center;
-            height: 24px;
-            outline: none;
-            transition: border-color 0.2s;
+            margin: 0 5px;
         }
 
-        .status-label {
-            color: #888;
-            margin-right: 8px;
-            font-size: 0.9em;
+        .signal-badge {
+            font-size: 0.75em;
+            background: #d32f2f;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+            animation: blinker 1.5s linear infinite;
         }
 
-        .status-value {
-            font-weight: 600;
+        .signal-area {
+            min-height: 24px;
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-top: 1px dashed #333;
+            padding-top: 5px;
+        }
+
+        @keyframes blinker {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        .stat-val span {
+            display: inline-block;
+        }
+
+        .arrow-up {
+            color: var(--buy-color);
+            font-weight: bold;
+        }
+
+        .arrow-down {
+            color: var(--sell-color);
+            font-weight: bold;
         }
 
         @keyframes slideIn {
@@ -266,355 +496,322 @@
             </div>
         </header>
 
-        <div class="dashboard">
+        <!-- 板块 1: 市场全景 (最上方) -->
+        <div class="layout-section">
+            <!-- 容器化结构确保绝对对齐 -->
+            <!-- 1. 三大核心卡片层 -->
+            <div class="market-content-grid" style="margin-top: 10px;">
+                <!-- 左：指数矩阵 -->
+                <div class="content-zone-card">
+                    <div class="card-zone-header">
+                        <div class="zone-header" style="margin-bottom:0;">指数动能 (15S)</div>
+                        <div style="flex:1;"></div>
+                        <div class="integrated-time" style="opacity:0;">--:--:--</div>
+                    </div>
+                    <div class="indices-grid" id="leading-container">
+                        <!-- JS 渲染 -->
+                    </div>
+                </div>
+
+                <!-- 中：分布图 + 深度集成统计 -->
+                <div class="content-zone-card">
+                    <div class="card-zone-header">
+                        <div class="zone-header" style="margin-bottom:0;">涨跌梯度分布</div>
+                        <div class="integrated-stats-row">
+                            <span><span style="color:rgba(255,255,255,0.3); font-weight:400;">涨</span> <span id="cnt-up"
+                                    style="color:var(--buy-color);">0</span></span>
+                            <span><span style="color:rgba(255,255,255,0.3); font-weight:400;">平</span> <span
+                                    id="cnt-flat" style="color: #666;">0</span></span>
+                            <span><span style="color:rgba(255,255,255,0.3); font-weight:400;">跌</span> <span
+                                    id="cnt-down" style="color:var(--sell-color);">0</span></span>
+                        </div>
+                        <div id="market-update-time" class="integrated-time">--:--:--</div>
+                    </div>
+                    <div class="distribution-chart" id="dist-chart">
+                        <!-- JS 填充 -->
+                    </div>
+                </div>
+
+                <!-- 右：预留模块 -->
+                <div class="content-zone-card"
+                    style="opacity: 0.5; background: repeating-linear-gradient(45deg, #1c1c1e, #1c1c1e 10px, #1e1e20 10px, #1e1e20 20px);">
+                    <div class="card-zone-header">
+                        <div class="zone-header" style="margin-bottom:0;">数据挖掘 / 预留空间</div>
+                        <div class="integrated-time" style="opacity:0;">--:--:--</div>
+                    </div>
+                    <div
+                        style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; color:#555;">
+                        <span style="font-size:1.5em; font-weight:800; letter-spacing:3px;">COMING</span>
+                        <span style="font-size:0.8em; margin-top:5px; opacity:0.6;">量化特征提取模块</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 板块 2: 监控管理 (中间) -->
+        <div class="layout-section">
             <div class="card">
                 <h2>监控管理</h2>
                 <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                    <input type="text" id="stock-input" placeholder="输入代码(如 600000) 或 名称(如 浦发银行)"
-                        style="padding: 12px; flex: 1; border-radius: 4px; border: 1px solid #444; background: #333; color: white; font-size: 16px;">
+                    <input type="text" id="stock-input" placeholder="输入代码(如 600000) 或 名称"
+                        style="padding:12px; flex:1; border-radius:4px; border:1px solid #444; background:#111; color:#fff;">
                     <button onclick="addStock()" class="ui-btn btn-success"
-                        style="height: 48px; border-radius: 4px; padding: 0 30px;">添加监控</button>
+                        style="height:45px; padding:0 30px;">添加监控</button>
                 </div>
-                <div class="ui-row">
-                    <!-- 左侧：系统状态 -->
-                    <div class="ui-card" style="justify-content: space-between;">
-                        <div style="display: flex; gap: 30px;">
-                            <div>
-                                <span class="status-label">系统状态</span>
-                                <span id="sys-status" class="status-value">就绪</span>
-                            </div>
-                            <div>
-                                <span class="status-label">监控总数</span>
-                                <span id="sys-count" class="status-value">0</span>
-                            </div>
-                        </div>
-                        <button id="btn-toggle-monitor" class="ui-btn" onclick="toggleMonitor()">启动监控</button>
-                    </div>
 
-                    <!-- 右侧：全局配置 -->
-                    <div class="ui-card" style="justify-content: space-between;">
-                        <div style="display: flex; align-items: center;">
-                            <span class="status-label">扫描间隔</span>
-                            <input type="number" id="scan-interval" class="ui-input" min="1" max="3600"
-                                placeholder="..">
-                            <span style="color: #666; font-size: 0.8em;">秒</span>
+                <div class="info-row">
+                    <div class="info-item" style="justify-content: space-between;">
+                        <div style="display:flex; gap:20px;">
+                            <span>状态: <span id="sys-status" style="font-weight:bold;">--</span></span>
+                            <span>总数: <span id="sys-count" style="font-weight:bold;">0</span></span>
                         </div>
-                        <button class="ui-btn btn-secondary" onclick="saveConfig()">保存设置</button>
+                        <button id="btn-toggle" class="ui-btn" onclick="toggleMonitor()">加载中...</button>
+                    </div>
+                    <div class="info-item" style="justify-content: space-between;">
+                        <div>
+                            <span>扫描间隔: </span>
+                            <input type="number" id="scan-interval" class="ui-input" min="1">
+                            <span>秒</span>
+                        </div>
+                        <button class="ui-btn btn-gray" onclick="saveConfig()">保存设置</button>
                     </div>
                 </div>
-                <h3>当前监控列表</h3>
+
+                <h3>当前监控</h3>
                 <table id="stock-table">
                     <thead>
                         <tr>
                             <th>代码</th>
                             <th>名称</th>
                             <th>现价</th>
-                            <th>涨跌幅</th>
+                            <th>涨跌</th>
                             <th>添加时间</th>
                             <th>操作</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- 股票列表 -->
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
+        </div>
 
+        <!-- 板块 3: 实时信号 (底部) -->
+        <div class="layout-section">
             <div class="card">
                 <h2>实时预警信号</h2>
                 <div class="signal-container">
                     <table id="signal-table">
                         <thead>
-                            <tr style="position: sticky; top: 0; background: var(--card-bg); z-index: 10;">
+                            <tr style="position:sticky; top:0; background:#222; z-index:10;">
                                 <th>时间</th>
                                 <th>股票</th>
                                 <th>周期</th>
-                                <th>信号类型</th>
+                                <th>信号</th>
                                 <th>价格</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <!-- 信号将通过 JS 动态插入 -->
-                        </tbody>
+                        <tbody></tbody>
                     </table>
                 </div>
             </div>
         </div>
-    </div>
+    </div> <!-- 关闭 .container -->
 
     <div id="alert-toast"></div>
-
     <audio id="alert-sound" src="https://assets.mixkit.co/sfx/preview/mixkit-software-interface-start-2574.mp3"></audio>
 
     <script>
-        const signalTable = document.getElementById('signal-table').getElementsByTagName('tbody')[0];
-        const stockTable = document.getElementById('stock-table').getElementsByTagName('tbody')[0];
         const statusDiv = document.getElementById('status');
         const lastScanDiv = document.getElementById('last-scan');
         const sysStatusSpan = document.getElementById('sys-status');
         const sysCountSpan = document.getElementById('sys-count');
-        const alertToast = document.getElementById('alert-toast');
+        const stockTable = document.getElementById('stock-table').querySelector('tbody');
+        const signalTable = document.getElementById('signal-table').querySelector('tbody');
         const alertSound = document.getElementById('alert-sound');
 
-        // 初始化加载
-        loadStocks();
-        loadSignals();
-        // 强制首次同步状态，确保 interval 被填入
-        updateSystemStatus(true);
-
-        setInterval(() => updateSystemStatus(), 5000); // 每5秒更新一次状态
-        setInterval(loadStocks, 5000); // 每5秒刷新一次行情
-
-        let ws;
-        function connectWebSocket() {
-            const wsUrl = `ws://${window.location.host}/ws/alerts`;
-            ws = new WebSocket(wsUrl);
-
-            ws.onopen = () => {
-                statusDiv.innerText = '实时连接: 已开启';
-                statusDiv.style.color = '#2ecc71';
-                console.log('WebSocket connected');
-            };
-
-            ws.onclose = () => {
-                statusDiv.innerText = '实时连接: 已断开 (正在尝试重连...)';
-                statusDiv.style.color = '#ff4d4d';
-                console.log('WebSocket disconnected. Reconnecting in 3 seconds...');
-                setTimeout(connectWebSocket, 3000); // 3秒后尝试重连
-            };
-
-            ws.onerror = (err) => {
-                console.error('WebSocket error:', err);
-                ws.close();
-            };
-
-            ws.onmessage = (event) => {
-                const alert = JSON.parse(event.data);
-                const isBuy = addSignalToTable(alert); // 修改 addSignalToTable 返回是否看涨
-                showToast(alert, isBuy);
+        // WebSocket
+        function connectWS() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.host}/ws/alerts`);
+            ws.onopen = () => { statusDiv.innerText = '实时连接: 正常'; statusDiv.style.color = '#2ecc71'; };
+            ws.onclose = () => { statusDiv.innerText = '实时连接: 断开 (重连中...)'; statusDiv.style.color = '#ff4d4d'; setTimeout(connectWS, 3000); };
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                const isBuy = addSignalRow(data);
+                showToast(data, isBuy);
                 alertSound.play();
             };
         }
 
-        // 初始化连接
-        connectWebSocket();
-
-        async function updateSystemStatus(isInitial = false) {
+        // 数据加载
+        async function refresh() {
             try {
-                const res = await fetch('/api/status');
-                const data = await res.json();
-                const isRunning = data.status === 'Running';
-
-                // 只有在没被选中，或者初始化时才更新显示值
-                const intervalInput = document.getElementById('scan-interval');
-                if (isInitial || document.activeElement !== intervalInput) {
-                    intervalInput.value = data.interval;
-                }
-
-                sysStatusSpan.innerText = isRunning ? '正在监控' : '已停止';
+                // 1. 系统状态
+                const sRes = await fetch('/api/status');
+                const sData = await sRes.json();
+                const isRunning = sData.status === 'Running';
+                sysStatusSpan.innerText = isRunning ? '正在运行' : '已停止';
                 sysStatusSpan.style.color = isRunning ? '#2ecc71' : '#ff4d4d';
-                lastScanDiv.innerText = `上次扫描: ${data.last_scan_time || '-'}`;
-                sysCountSpan.innerText = data.stock_count;
+                sysCountSpan.innerText = sData.stock_count;
+                lastScanDiv.innerText = '上次扫描: ' + (sData.last_scan_time || '-');
 
-                // 更新按钮状态与颜色
-                const btn = document.getElementById('btn-toggle-monitor');
-                if (isRunning) {
-                    btn.innerText = '停止监控';
-                    btn.classList.remove('btn-success');
-                    btn.classList.add('btn-danger');
-                } else {
-                    btn.innerText = '启动监控';
-                    btn.classList.remove('btn-danger');
-                    btn.classList.add('btn-success');
-                }
-            } catch (e) {
-                console.error("Failed to update status", e);
-            }
-        }
+                const intervalInp = document.getElementById('scan-interval');
+                if (document.activeElement !== intervalInp) intervalInp.value = sData.interval;
 
-        // 调用初始化状态获取
-        updateSystemStatus(true);
+                const btn = document.getElementById('btn-toggle');
+                btn.innerText = isRunning ? '停止监控' : '启动监控';
+                btn.className = isRunning ? 'ui-btn btn-danger' : 'ui-btn btn-success';
 
-        async function toggleMonitor() {
-            const btn = document.getElementById('btn-toggle-monitor');
-            const isRunning = btn.innerText === '停止监控';
-            const action = isRunning ? 'stop' : 'start';
-
-            try {
-                const res = await fetch(`/api/monitor/${action}`, { method: 'POST' });
-                if (res.ok) {
-                    updateSystemStatus();
-                    showToast({ stock_code: '系统', timeframe: '全局', signal_type: isRunning ? '监控已计划停止' : '监控已计划启动' }, !isRunning);
-                }
-            } catch (e) {
-                alert('操作失败: ' + e);
-            }
-        }
-
-        async function saveConfig() {
-            const intervalInput = document.getElementById('scan-interval');
-            const interval = parseInt(intervalInput.value);
-            if (isNaN(interval) || interval < 1) {
-                alert('请输入有效的扫描间隔（大于0）');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ interval: interval })
-                });
-
-                if (response.ok) {
-                    alert('配置已成功保存！');
-                    const statusRes = await fetch('/api/status');
-                    const statusData = await statusRes.json();
-                    const isRunning = statusData.status === 'Running';
-
-                    if (isRunning) {
-                        if (confirm('是否立即重启监控以应用新间隔？')) {
-                            await fetch('/api/monitor/stop', { method: 'POST' });
-                            setTimeout(async () => {
-                                await fetch('/api/monitor/start', { method: 'POST' });
-                                showToast({ stock_code: '系统', timeframe: '全局', signal_type: '监控已重启并应用新配置' }, true);
-                                updateSystemStatus(true);
-                            }, 500);
-                        }
-                    } else {
-                        showToast({ stock_code: '系统', timeframe: '全局', signal_type: '扫描间隔已设定，下次启动生效' }, true);
-                    }
-                }
-            } catch (error) {
-                console.error('Save config error:', error);
-                alert('保存配置失败');
-            }
-        }
-
-        async function loadStocks() {
-            try {
-                const res = await fetch('/api/stocks');
-                const stocks = await res.json();
+                // 2. 股票列表
+                const stRes = await fetch('/api/stocks');
+                const stocks = await stRes.json();
                 stockTable.innerHTML = '';
-                stocks.forEach(stock => {
+                stocks.forEach(s => {
                     const row = stockTable.insertRow();
-                    const changeColor = stock.change_pct > 0 ? '#ff4d4d' : (stock.change_pct < 0 ? '#2ecc71' : '#e0e0e0');
+                    const color = s.change_pct > 0 ? '#ff4d4d' : (s.change_pct < 0 ? '#2ecc71' : '#aaa');
                     row.innerHTML = `
-                        <td>${stock.code}</td>
-                        <td>${stock.name || '-'}</td>
-                        <td style="color: ${changeColor}; font-weight: bold;">${stock.price.toFixed(2)}</td>
-                        <td style="color: ${changeColor}; font-weight: bold;">${stock.change_pct > 0 ? '+' : ''}${stock.change_pct.toFixed(2)}%</td>
-                        <td>${stock.added_at}</td>
-                        <td><button onclick="deleteStock('${stock.code}')" class="ui-btn btn-secondary" style="height: 24px; padding: 0 8px; font-size: 11px; border-color: rgba(231, 76, 60, 0.3); color: #e74c3c;">删除</button></td>
+                        <td>${s.code}</td><td>${s.name || '-'}</td>
+                        <td style="color:${color}; font-weight:bold;">${s.price.toFixed(2)}</td>
+                        <td style="color:${color}; font-weight:bold;">${s.change_pct.toFixed(2)}%</td>
+                        <td style="font-size:0.8em; color:#666;">${s.added_at}</td>
+                        <td><button onclick="delStock('${s.code}')" style="background:none; border:none; color:#e74c3c; cursor:pointer;">删除</button></td>
                     `;
                 });
-            } catch (e) {
-                console.error("Failed to load stocks", e);
-            }
+
+                // 3. 市场统计
+                const mRes = await fetch('/api/market_stats');
+                const mData = await mRes.json();
+                if (mData.timestamp) {
+                    document.getElementById('market-update-time').innerText = mData.timestamp;
+
+                    // 多指数领先指标处理
+                    const leadingContainer = document.getElementById('leading-container');
+                    leadingContainer.innerHTML = '';
+
+                    if (mData.leading && Array.isArray(mData.leading)) {
+                        // 确定性只取 4 个，形成整齐矩阵
+                        mData.leading.slice(0, 4).forEach((item) => {
+                            const card = document.createElement('div');
+                            card.className = 'stat-card';
+                            const isUp = item.dir === 'up';
+                            const arrow = isUp ? `<span class="arrow-up">↑</span>` : `<span class="arrow-down">↓</span>`;
+                            const dirText = isUp ? '动能向上' : '动能向下';
+
+                            let signalHtml = '';
+                            if (item.signals && item.signals.length > 0) {
+                                signalHtml = `<div class="signal-badge" style="font-size:0.65em; padding:2px 6px;">${item.signals.join(' | ')}</div>`;
+                            }
+
+                            card.innerHTML = `
+                                    <div class="stat-label" style="font-size:0.85em; color:#888;">${item.name}</div>
+                                    <div class="stat-val">
+                                        <span class="white-line">${item.white}</span>
+                                        <span style="opacity:0.2; margin:0 2px;">/</span>
+                                        <span class="yellow-line">${item.yellow}</span>
+                                    </div>
+                                    <div style="font-size:0.7em; margin-top:5px; display:flex; align-items:center; justify-content:space-between; font-weight:600;">
+                                        <span style="color:${isUp ? 'var(--buy-color)' : 'var(--sell-color)'}; display:flex; align-items:center; gap:2px;">
+                                            ${dirText} ${arrow}
+                                        </span>
+                                        <span style="color:${isUp ? 'var(--buy-color)' : 'var(--sell-color)'}">${item.diff_pct}%</span>
+                                    </div>
+                                    <div class="signal-area">${signalHtml}</div>
+                                `;
+                            leadingContainer.appendChild(card);
+                        });
+                    }
+
+                    document.getElementById('cnt-up').innerText = mData.counts.up;
+                    document.getElementById('cnt-flat').innerText = mData.counts.flat;
+                    document.getElementById('cnt-down').innerText = mData.counts.down;
+
+                    // 渲染全量分布图
+                    const d = mData.distribution;
+                    const distChart = document.getElementById('dist-chart');
+                    distChart.innerHTML = '';
+
+                    const seq = [
+                        { lbl: '>9%', v: d.up_limit, c: 'up-bg' }, { lbl: '7-9', v: d.up_7_10, c: 'up-bg' },
+                        { lbl: '5-7', v: d.up_5_7, c: 'up-bg' }, { lbl: '2-5', v: d.up_2_5, c: 'up-bg' },
+                        { lbl: '0-2', v: d.up_0_2, c: 'up-bg' }, { lbl: '平', v: d.zero, c: 'flat-bg' },
+                        { lbl: '-2-0', v: d.down_0_2, c: 'down-bg' }, { lbl: '-5-2', v: d.down_2_5, c: 'down-bg' },
+                        { lbl: '-7-5', v: d.down_5_7, c: 'down-bg' }, { lbl: '-9-7', v: d.down_7_10, c: 'down-bg' },
+                        { lbl: '<-9%', v: d.down_limit, c: 'down-bg' }
+                    ];
+
+                    const maxVal = Math.max(...seq.map(x => x.v), 10);
+                    seq.forEach(it => {
+                        const h = (it.v / maxVal) * 100;
+                        const col = document.createElement('div');
+                        col.className = 'dist-col';
+                        // Determine the actual background color for the shadow
+                        let barBgColor;
+                        if (it.c === 'up-bg') barBgColor = '#ff4d4d';
+                        else if (it.c === 'down-bg') barBgColor = '#2ecc71';
+                        else barBgColor = '#555';
+
+                        col.innerHTML = `
+                                <div class="dist-cnt">${it.v || ''}</div>
+                                <div class="dist-bar ${it.c}" style="height:${h}%; width:100%; min-width:8px; max-width:24px; box-shadow: 0 0 10px ${barBgColor}33;"></div>
+                                <div class="dist-lbl">${it.lbl}</div>
+                            `;
+                        distChart.appendChild(col);
+                    });
+                }
+            } catch (err) { console.error(err); }
         }
 
-        async function loadSignals() {
-            const res = await fetch('/api/signals');
-            const signals = await res.json();
-            signalTable.innerHTML = '';
-            signals.forEach(addSignalToTable);
-        }
-
-        async function addStock() {
-            const input = document.getElementById('stock-input');
-            const code = input.value.trim();
-            if (!code) return alert('请输入股票代码或名称');
-
-            const res = await fetch('/api/stocks', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code })
-            });
-            const result = await res.json();
-            if (result.status === 'success') {
-                input.value = '';
-                loadStocks();
-                showToast({ stock_code: result.data.code, timeframe: '系统', signal_type: '添加成功' });
-            } else {
-                alert('添加失败: ' + result.message);
-            }
-        }
-
-        async function deleteStock(code) {
-            if (!confirm(`确定删除 ${code} 吗？`)) return;
-            const res = await fetch(`/api/stocks/${code}`, { method: 'DELETE' });
-            const result = await res.json();
-            if (result.status === 'success') {
-                loadStocks();
-            }
-        }
-
-        function addSignalToTable(alert) {
+        function addSignalRow(s) {
             const row = signalTable.insertRow(0);
-            const stockCode = alert.stock_code || alert.code;
-            const stockName = alert.name || '';
-            const displayName = stockName ? `${stockName} (${stockCode})` : stockCode;
-
-            // 信号名称字典 (转换历史英文信号)
-            const signalMap = {
-                'DIV_BULL': 'MACD底背离',
-                'DIV_BEAR': 'MACD顶背离',
-                'TD9_BUY': 'TD低9',
-                'TD9_SELL': 'TD高9'
-            };
-
-            let signalType = alert.signal_type;
-            // 只要匹配字典，就强制转换
-            if (signalMap[signalType]) {
-                signalType = signalMap[signalType];
-            }
-
-            // 颜色逻辑：低/底 -> 红色 (signal-buy), 高/顶 -> 绿色 (signal-sell)
-            // 匹配中文关键词以确保颜色准确
-            const isBuy = signalType.includes('低') || signalType.includes('底') || signalType.includes('BULL') || signalType.includes('BUY');
-            const signalClass = isBuy ? 'signal-buy' : 'signal-sell';
-
-            row.innerHTML = `
-                <td>${alert.timestamp || alert.added_at}</td>
-                <td>${displayName}</td>
-                <td>${alert.timeframe}</td>
-                <td class="${signalClass}">
-                    ${signalType}
-                </td>
-                <td>${alert.price}</td>
-            `;
-
-            // 更新该警报的对象属性，确保 toast 使用正确的中文
-            alert.display_signal = signalType;
+            const map = { 'DIV_BULL': 'MACD底背离', 'DIV_BEAR': 'MACD顶背离', 'TD9_BUY': 'TD低9', 'TD9_SELL': 'TD高9' };
+            const type = map[s.signal_type] || s.signal_type;
+            const isBuy = /买|低|底|BULL|BUY/.test(type);
+            const cls = isBuy ? 'signal-buy' : 'signal-sell';
+            row.innerHTML = `<td>${s.timestamp || s.added_at}</td><td>${s.name || s.stock_code}</td><td>${s.timeframe}</td><td class="${cls}">${type}</td><td>${s.price}</td>`;
+            s.display_type = type;
             return isBuy;
         }
 
-        function showToast(alert, isBuy) {
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-
-            // 根据买卖信号设置气泡背景色
-            if (isBuy !== undefined) {
-                toast.style.backgroundColor = isBuy ? '#d32f2f' : '#27ae60';
-            }
-
-            const signal = alert.display_signal || alert.signal_type;
-            toast.innerHTML = `
-                <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">新信号提醒</div>
-                <div>${alert.name || alert.stock_code} (${alert.timeframe}) - ${signal}</div>
-                <div style="font-size: 0.8em; margin-top: 5px; opacity: 0.8; text-align: right;">点击关闭</div>
-            `;
-
-            // 手动点击关闭
-            toast.onclick = () => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(100%)';
-                setTimeout(() => toast.remove(), 200);
-            };
-
-            alertToast.appendChild(toast);
-            // 不再使用 setTimeout 自动删除
+        function showToast(s, isBuy) {
+            const t = document.createElement('div');
+            t.className = 'toast';
+            if (isBuy !== undefined) t.style.backgroundColor = isBuy ? '#d32f2f' : '#27ae60';
+            t.innerHTML = `<b>信号提醒</b><br>${s.name || s.stock_code} (${s.timeframe}) - ${s.display_type || s.signal_type}<br><small>点击关闭</small>`;
+            t.onclick = () => { t.style.opacity = '0'; setTimeout(() => t.remove(), 200); };
+            document.getElementById('alert-toast').appendChild(t);
         }
+
+        // 操作
+        async function toggleMonitor() {
+            const action = sysStatusSpan.innerText === '正在运行' ? 'stop' : 'start';
+            await fetch(`/api/monitor/${action}`, { method: 'POST' });
+            refresh();
+        }
+
+        async function addStock() {
+            const code = document.getElementById('stock-input').value.trim();
+            if (!code) return;
+            const res = await fetch('/api/stocks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+            if (res.ok) { document.getElementById('stock-input').value = ''; refresh(); }
+        }
+
+        async function delStock(code) {
+            if (confirm('删除 ' + code + '?')) { await fetch(`/api/stocks/${code}`, { method: 'DELETE' }); refresh(); }
+        }
+
+        async function saveConfig() {
+            const interval = parseInt(document.getElementById('scan-interval').value);
+            await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interval }) });
+            alert('保存成功');
+        }
+
+        // Init
+        connectWS();
+        refresh();
+        setInterval(refresh, 5000);
+        async function loadHistory() {
+            const res = await fetch('/api/signals');
+            (await res.json()).slice().reverse().forEach(addSignalRow);
+        }
+        loadHistory();
     </script>
 </body>
 

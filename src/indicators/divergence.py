@@ -15,6 +15,7 @@ def detect_divergence(df: pd.DataFrame) -> Dict[str, bool]:
     """
     检测顶底背离 (基于 DEA 拐头)
     """
+    df = df.copy() # 显式复制以避免 SettingWithCopyWarning
     if 'diff' not in df.columns:
         df = calculate_macd(df)
     

@@ -6,6 +6,7 @@ from typing import List, Dict
 from src.data.qmt_client import QMTClient
 from src.indicators.td_sequential import calculate_td_sequential
 from src.indicators.divergence import detect_divergence
+from src.indicators.depth_patterns import detect_depth_patterns
 from src.data.database import connect_to_db
 
 class MonitorService:
@@ -26,9 +27,16 @@ class MonitorService:
             
         stock_name = ""
         try:
-            # 周期内去重检查：如果在该 K 线时间戳下已经报过相同的信号，则忽略
-            check_sql = "SELECT id FROM signal_history WHERE stock_code=%s AND timeframe=%s AND signal_type=%s AND bar_time=%s"
-            cursor.execute(check_sql, (stock_code, timeframe, signal_type, bar_time))
+            # 周期内去重检查
+            if timeframe == 'tick':
+                # 盘口信号去重：同一只票同一个信号类型在 1 分钟内不重复报（防止 Tick 快速刷新导致的重复）
+                check_sql = "SELECT id FROM signal_history WHERE stock_code=%s AND signal_type=%s AND timestamp > DATE_SUB(NOW(), INTERVAL 1 MINUTE)"
+                cursor.execute(check_sql, (stock_code, signal_type))
+            else:
+                # K线信号去重：基于 K 线时间戳
+                check_sql = "SELECT id FROM signal_history WHERE stock_code=%s AND timeframe=%s AND signal_type=%s AND bar_time=%s"
+                cursor.execute(check_sql, (stock_code, timeframe, signal_type, bar_time))
+            
             if cursor.fetchone():
                 return
                 
@@ -81,35 +89,73 @@ class MonitorService:
         for tf in timeframes:
             try:
                 df = self.client.get_kline(stock_code, tf)
-                if df.empty:
+                if df.empty or len(df) < 2:
                     continue
                 
-                # 获取当前最后一根 K 线的时间戳作为该周期的“指纹”
-                # 注意：get_kline 已经做过 reset_index，时间戳现在在 'time' 列中
-                raw_time = df['time'].iloc[-1]
+                # 准确性优化：丢弃最后一根尚未收盘的 K 线，确保计算基于“已收盘”数据
+                # 在实时行情中，最后一根 K 线的 close 是变动的，会导致 TD9 信号反复出现/消失
+                df_stable = df.iloc[:-1].copy()
+                if len(df_stable) < 13: # TD9 至少需要 13 根
+                    continue
+
+                # 获取稳定最后一根 K 线的时间戳
+                raw_time = df_stable['time'].iloc[-1]
                 if isinstance(raw_time, (int, float, np.integer)):
                     ts = raw_time / 1000 if raw_time > 1e11 else raw_time
                     current_bar_time = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
                 else:
                     current_bar_time = str(raw_time)
                 
-                # TD9
-                td_signals = calculate_td_sequential(df)
+                # TD9 (使用稳定 K 线)
+                td_signals = calculate_td_sequential(df_stable)
+                last_stable_close = df_stable['close'].iloc[-1]
                 if td_signals['buy_9']:
-                    self._save_signal(stock_code, tf, 'TD低9', df['close'].iloc[-1], current_bar_time)
+                    self._save_signal(stock_code, tf, 'TD低9', last_stable_close, current_bar_time)
                 if td_signals['sell_9']:
-                    self._save_signal(stock_code, tf, 'TD高9', df['close'].iloc[-1], current_bar_time)
+                    self._save_signal(stock_code, tf, 'TD高9', last_stable_close, current_bar_time)
                 
-                # Divergence
-                div_signals = detect_divergence(df)
+                # Divergence (使用稳定 K 线)
+                div_signals = detect_divergence(df_stable)
                 if div_signals['bull_div']:
-                    self._save_signal(stock_code, tf, 'MACD底背离', df['close'].iloc[-1], current_bar_time)
+                    self._save_signal(stock_code, tf, 'MACD底背离', last_stable_close, current_bar_time)
                 if div_signals['bear_div']:
-                    self._save_signal(stock_code, tf, 'MACD顶背离', df['close'].iloc[-1], current_bar_time)
+                    self._save_signal(stock_code, tf, 'MACD顶背离', last_stable_close, current_bar_time)
             except Exception as e:
                 print(f"扫描 {stock_code} {tf} 周期异常: {e}")
-                import traceback
-                traceback.print_exc()
+        
+        # 扫描盘口异动 (Tick 级别)
+        try:
+            self._scan_depth_patterns(stock_code)
+        except Exception as e:
+            print(f"扫描 {stock_code} 盘口异常: {e}")
+
+    def _scan_depth_patterns(self, stock_code: str):
+        """扫描盘口特殊数字与失衡"""
+        # 获取全量 Tick
+        ticks = self.client.xt_data.get_full_tick([stock_code])
+        if not ticks or stock_code not in ticks:
+            return
+            
+        tick = ticks[stock_code]
+        # 从配置中读取参数 (带默认回退)
+        monitor_cfg = self.config.get('monitor', {})
+        target_nums = monitor_cfg.get('special_numbers', [777, 888, 999])
+        gap_ratio = monitor_cfg.get('depth_gap_ratio', 0.01)
+        min_vol = monitor_cfg.get('depth_min_vol', 50.0)
+        
+        patterns = detect_depth_patterns(
+            tick, 
+            target_nums, 
+            gap_ratio_threshold=gap_ratio,
+            min_vol_threshold=min_vol
+        )
+        for p in patterns:
+            # 信号类型直接使用算法返回的描述
+            signal_type = p['desc']
+            # 盘口信号使用当前时间作为标记
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # 信号去重和保存
+            self._save_signal(stock_code, 'tick', signal_type, p['price'], current_time)
 
     def run(self):
         self.running = True

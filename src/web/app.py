@@ -5,6 +5,7 @@ import json
 import asyncio
 import os
 from src.services.monitor import MonitorService
+from src.services.market_stats import MarketStatsService
 from src.data.database import connect_to_db
 
 app = FastAPI()
@@ -17,6 +18,10 @@ DB_PATH = os.path.join(BASE_DIR, "data", "qmt_jk.db")
 # 初始化监控服务
 monitor = MonitorService(CONFIG_PATH, DB_PATH)
 monitor.start()
+
+# 初始化全市场统计服务
+market_stats_service = MarketStatsService(monitor.client)
+current_market_stats = {}
 
 # 静态文件
 STATIC_DIR = os.path.join(BASE_DIR, "src", "web", "static")
@@ -156,6 +161,10 @@ async def get_status():
         "interval": interval
     }
 
+@app.get("/api/market_stats")
+async def get_market_stats():
+    return current_market_stats
+
 @app.post("/api/config")
 async def update_config(config: dict):
     success = monitor.update_config(config)
@@ -192,10 +201,26 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception:
         manager.disconnect(websocket)
 
+# 背景任务：全市场统计更新
+async def market_stats_updater():
+    global current_market_stats
+    while True:
+        try:
+            # 使用 to_thread 避免同步调用阻塞异步事件循环
+            # 否则 10 次 get_kline 可能消耗数秒时间，导致 WebSocket 广播(弹窗)卡顿
+            stats = await asyncio.to_thread(market_stats_service.update_stats)
+            if stats:
+                current_market_stats = stats
+        except Exception as e:
+            print(f"统计更新异常: {e}")
+        await asyncio.sleep(15) # 每15秒统计一次
+
 @app.on_event("startup")
 async def startup_event():
     # 启动背景广播任务
     asyncio.create_task(alert_broadcaster())
+    # 启动全市场统计任务
+    asyncio.create_task(market_stats_updater())
 
 if __name__ == "__main__":
     import uvicorn

@@ -28,7 +28,8 @@ start "" "E:\gj_qmt\bin.x64\XtMiniQmt.exe"
 timeout /t 5 >nul
 
 :: 运行程序
-echo 正在启动监控后台...
+echo 正在启动监控后台并打开浏览器...
+start "" "http://localhost:8000"
 %PYTHON_EXE% main.py
 
 echo.

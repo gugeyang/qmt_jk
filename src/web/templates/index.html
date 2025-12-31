@@ -95,6 +95,11 @@
             font-weight: bold;
         }
 
+        .signal-watch {
+            color: #f1c40f;
+            font-weight: bold;
+        }
+
         .signal-container {
             max-height: 500px;
             overflow-y: auto;
@@ -793,18 +798,35 @@
             const row = signalTable.insertRow(0);
             const map = { 'DIV_BULL': 'MACD底背离', 'DIV_BEAR': 'MACD顶背离', 'TD9_BUY': 'TD低9', 'TD9_SELL': 'TD高9' };
             const type = map[s.signal_type] || s.signal_type;
-            const isBuy = /买|低|底|BULL|BUY/.test(type);
-            const cls = isBuy ? 'signal-buy' : 'signal-sell';
+
+            // 判定信号类别 (V25.Final-VisualLayer)
+            const isWatch = type.includes('挂单');
+            const isBuy = !isWatch && /买|低|底|BULL|BUY/.test(type);
+
+            let cls = isWatch ? 'signal-watch' : (isBuy ? 'signal-buy' : 'signal-sell');
             row.innerHTML = `<td>${s.timestamp || s.added_at}</td><td>${s.name || s.stock_code}</td><td>${s.timeframe}</td><td class="${cls}">${type}</td><td>${s.price}</td>`;
             s.display_type = type;
+            s.is_watch = isWatch;
             return isBuy;
         }
 
         function showToast(s, isBuy) {
             const t = document.createElement('div');
             t.className = 'toast';
-            if (isBuy !== undefined) t.style.backgroundColor = isBuy ? '#d32f2f' : '#27ae60';
-            t.innerHTML = `<b>信号提醒</b><br>${s.name || s.stock_code} (${s.timeframe}) - ${s.display_type || s.signal_type}<br><small>点击关闭</small>`;
+
+            // 背景色分层
+            if (s.is_watch) t.style.backgroundColor = '#b7950b'; // 观察色(深黄)
+            else if (isBuy !== undefined) t.style.backgroundColor = isBuy ? '#d32f2f' : '#27ae60';
+
+            const timeStr = s.timestamp ? s.timestamp.split(' ')[1] : '';
+            t.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px;">
+                    <b>${s.is_watch ? '行情观察' : '信号提醒'}</b>
+                    <span style="font-size:0.8em; opacity:0.9;">${timeStr}</span>
+                </div>
+                ${s.name || s.stock_code} (${s.timeframe}) - ${s.display_type || s.signal_type}<br>
+                <small style="opacity:0.6; margin-top:4px; display:block;">点击关闭</small>
+            `;
             t.onclick = () => { t.style.opacity = '0'; setTimeout(() => t.remove(), 200); };
             document.getElementById('alert-toast').appendChild(t);
         }
